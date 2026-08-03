@@ -296,54 +296,94 @@
     }
 
     async function checkInTicket(ticketId) {
-      if (!API_BASE) {
-        setStatus('<strong>Status:</strong> missing Apps Script URL');
-        openPopup('invalid', 'Missing backend URL', 'Pass the Apps Script web app URL in the ?api= parameter.', '', '', '❌');
-        return;
-      }
+  if (!API_BASE) {
+    setStatus('<strong>Status:</strong> missing Apps Script URL');
+    openPopup(
+      'invalid',
+      'Missing backend URL',
+      'Pass the Apps Script web app URL in the ?api= parameter.',
+      '',
+      '',
+      '❌'
+    );
+    return;
+  }
 
-      try {
-        const url = API_BASE
-          + '?page=scanner-api'
-          + '&action=checkIn'
-          + '&ticketId=' + encodeURIComponent(ticketId)
-          + '&staffName=' + encodeURIComponent(STAFF_NAME)
-          + '&gateLabel=' + encodeURIComponent(GATE_LABEL);
+  try {
+    const url =
+      API_BASE +
+      '?page=scanner-api' +
+      '&action=checkIn' +
+      '&ticketId=' + encodeURIComponent(ticketId) +
+      '&staffName=' + encodeURIComponent(STAFF_NAME) +
+      '&gateLabel=' + encodeURIComponent(GATE_LABEL);
 
-        const res = await jsonp(url);
+    const res = await jsonp(url);
 
-        if (res && res.success && res.status === 'VALID') {
-          setStatus('<strong>Status:</strong> <span style="color:#22c55e">valid ticket</span>');
-          openPopup(
-            'valid',
-            'Valid Ticket',
-            res.ticketId || ticketId,
-            'Checked in at ' + (res.checkedInTime || ''),
-            'By ' + STAFF_NAME,
-            '✅'
-          );
-        } else if (res && res.status === 'ALREADY_USED') {
-          setStatus('<strong>Status:</strong> <span style="color:#f59e0b">already used</span>');
-          openPopup(
-            'used',
-            'Already Used',
-            res.ticketId || ticketId,
-            'Checked in at ' + (res.checkedInTime || ''),
-            'By ' + (res.checkedInBy || ''),
-            '⚠️'
-          );
-        } else {
-          const msg = (res && res.error) ? res.error : 'Ticket not recognized.';
-          setStatus('<strong>Status:</strong> <span style="color:#ef4444">invalid</span>');
-          openPopup('invalid', 'Invalid Ticket', msg, '', '', '❌');
-        }
-      } catch (err) {
-        console.error(err);
-        setStatus('<strong>Status:</strong> <span style="color:#ef4444">connection error</span>');
-        openPopup('invalid', 'Connection Error', 'Could not reach the Apps Script backend.', '', '', '❌');
-      }
+    console.log("Scanner response:", res);
+
+    // ---------------- VALID ----------------
+    if (res && res.status === "VALID") {
+
+      setStatus('<strong>Status:</strong> <span style="color:#22c55e">valid ticket</span>');
+
+      openPopup(
+        'valid',
+        'Valid Ticket',
+        res.ticketId || ticketId,
+        'Checked in at ' + (res.checkedInTime || ''),
+        'By ' + (res.checkedInBy || STAFF_NAME),
+        '✅'
+      );
+
+      return;
     }
 
+    // ---------------- ALREADY USED ----------------
+    if (res && res.status === "ALREADY_USED") {
+
+      setStatus('<strong>Status:</strong> <span style="color:#f59e0b">already used</span>');
+
+      openPopup(
+        'used',
+        'Already Used',
+        res.ticketId || ticketId,
+        'Checked in at ' + (res.checkedInTime || 'Unknown'),
+        'By ' + (res.checkedInBy || 'Unknown'),
+        '⚠️'
+      );
+
+      return;
+    }
+
+    // ---------------- INVALID ----------------
+    setStatus('<strong>Status:</strong> <span style="color:#ef4444">invalid ticket</span>');
+
+    openPopup(
+      'invalid',
+      'Invalid Ticket',
+      res?.error || 'Ticket not recognized.',
+      '',
+      '',
+      '❌'
+    );
+
+  } catch (err) {
+
+    console.error(err);
+
+    setStatus('<strong>Status:</strong> <span style="color:#ef4444">connection error</span>');
+
+    openPopup(
+      'invalid',
+      'Connection Error',
+      'Could not reach the Apps Script backend.',
+      '',
+      '',
+      '❌'
+    );
+  }
+}
     document.getElementById('startBtn').addEventListener('click', startCamera);
     document.getElementById('stopBtn').addEventListener('click', stopScanner);
 
