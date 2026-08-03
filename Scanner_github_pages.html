@@ -1,0 +1,358 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>EventPass Scanner</title>
+  <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
+  <style>
+    :root{
+      --bg:#0b1220; --panel:#101a2ecc; --panel2:#111827;
+      --line:rgba(255,255,255,.08); --text:#e8eefc; --muted:#90a0c0;
+      --brand:#4f46e5; --success:#22c55e; --warn:#f59e0b; --danger:#ef4444;
+    }
+    *{box-sizing:border-box;margin:0;padding:0}
+    body{
+      min-height:100vh; font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;
+      color:var(--text);
+      background:
+        radial-gradient(900px 500px at 10% 0%, #1d4ed833 0%, transparent 60%),
+        radial-gradient(700px 500px at 90% 15%, #14b8a633 0%, transparent 55%),
+        linear-gradient(180deg,#0b1220 0%, #0f172a 100%);
+      padding:16px;
+    }
+    .wrap{max-width:760px;margin:0 auto}
+    .top{
+      display:flex; align-items:center; justify-content:space-between; gap:12px;
+      margin-bottom:16px;
+    }
+    .brand small{display:block;color:var(--muted);font-size:11px;text-transform:uppercase;letter-spacing:.12em}
+    .brand h1{font-size:22px;line-height:1.1}
+    .pill{
+      padding:10px 12px; border:1px solid var(--line); border-radius:999px;
+      background:rgba(255,255,255,.04); color:var(--text); font-size:13px; text-decoration:none;
+      white-space:nowrap;
+    }
+    .card{
+      background:rgba(16,26,46,.88); border:1px solid var(--line); border-radius:24px;
+      box-shadow:0 20px 60px rgba(0,0,0,.28); overflow:hidden;
+      backdrop-filter: blur(14px);
+    }
+    .hero{
+      padding:18px 18px 14px;
+      border-bottom:1px solid var(--line);
+    }
+    .hero h2{font-size:18px; margin-bottom:4px}
+    .hero p{font-size:13px; color:var(--muted); line-height:1.45}
+    .meta{
+      display:grid; grid-template-columns:1fr 1fr; gap:10px;
+      padding:14px 18px 0;
+    }
+    .meta .box{
+      border:1px solid var(--line); border-radius:16px; padding:12px;
+      background:rgba(255,255,255,.03);
+    }
+    .meta .k{font-size:11px; color:var(--muted); text-transform:uppercase; letter-spacing:.08em; margin-bottom:4px}
+    .meta .v{font-size:13px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap}
+    .scanner{
+      padding:18px;
+    }
+    #reader{
+      width:100%; min-height:320px; border-radius:20px; overflow:hidden;
+      border:1px solid var(--line); background:#050b16;
+    }
+    .actions{
+      display:flex; gap:10px; flex-wrap:wrap; margin-top:14px;
+    }
+    .btn{
+      border:none; border-radius:14px; padding:12px 14px; font-weight:700; font-size:14px;
+      cursor:pointer; color:#fff;
+    }
+    .btn.primary{background:var(--brand)}
+    .btn.gray{background:#334155}
+    .btn.good{background:#166534}
+    .btn.bad{background:#7f1d1d}
+    .status{
+      margin-top:14px; padding:12px 14px; border-radius:14px; border:1px solid var(--line);
+      background:rgba(255,255,255,.03); color:var(--muted); font-size:13px; line-height:1.45;
+    }
+    .status strong{color:var(--text)}
+    .popup{
+      position:fixed; inset:0; display:none; align-items:center; justify-content:center;
+      background:rgba(0,0,0,.55); padding:18px; z-index:999;
+    }
+    .popup.show{display:flex}
+    .popup-card{
+      width:100%; max-width:360px; border-radius:24px; background:#fff; color:#0f172a;
+      padding:26px 22px; text-align:center; box-shadow:0 30px 80px rgba(0,0,0,.35);
+      border-top:8px solid var(--brand);
+    }
+    .popup-card.valid{border-top-color:var(--success)}
+    .popup-card.used{border-top-color:var(--warn)}
+    .popup-card.invalid{border-top-color:var(--danger)}
+    .icon{font-size:44px; margin-bottom:6px}
+    .popup-card h3{font-size:22px; margin-bottom:4px}
+    .popup-card p{font-size:14px; color:#475569; margin:4px 0}
+    .popup-card .tiny{font-size:12px; color:#64748b}
+    .spinner{
+      display:inline-block; width:16px; height:16px; border:2px solid rgba(255,255,255,.2);
+      border-top-color:#fff; border-radius:50%; animation:spin 1s linear infinite; vertical-align:-3px;
+    }
+    @keyframes spin{to{transform:rotate(360deg)}}
+    @media (max-width:520px){
+      .meta{grid-template-columns:1fr}
+      .hero h2{font-size:17px}
+      #reader{min-height:280px}
+    }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="top">
+      <div class="brand">
+        <small>EventPass Lite</small>
+        <h1>Scanner</h1>
+      </div>
+      <a class="pill" id="backLink" href="#">Back</a>
+    </div>
+
+    <div class="card">
+      <div class="hero">
+        <h2 id="helloText">Ready to scan</h2>
+        <p>Open the camera, scan a ticket, and the ticket ID will be sent to your Google Sheets backend for check-in.</p>
+      </div>
+
+      <div class="meta">
+        <div class="box">
+          <div class="k">Staff</div>
+          <div class="v" id="staffLabel">Unknown</div>
+        </div>
+        <div class="box">
+          <div class="k">Gate</div>
+          <div class="v" id="gateLabel">Scanner</div>
+        </div>
+      </div>
+
+      <div class="scanner">
+        <div id="reader"></div>
+        <div class="actions">
+          <button class="btn primary" id="startBtn">Start camera</button>
+          <button class="btn gray" id="stopBtn">Stop</button>
+        </div>
+        <div class="status" id="statusBox">
+          <strong>Status:</strong> waiting to start camera
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="popup" id="popup">
+    <div class="popup-card" id="popupCard">
+      <div class="icon" id="popupIcon">🎟️</div>
+      <h3 id="popupTitle">Ticket</h3>
+      <p id="popupLine1"></p>
+      <p id="popupLine2"></p>
+      <p class="tiny" id="popupLine3"></p>
+      <button class="btn primary" style="width:100%;margin-top:14px" onclick="closePopup()">Close</button>
+    </div>
+  </div>
+
+  <script>
+    const qs = new URLSearchParams(location.search);
+    const API_BASE = qs.get('api') || '';
+    const STAFF_NAME = qs.get('staff') || 'Scanner';
+    const BACK_URL = qs.get('back') || (API_BASE ? (API_BASE + '?page=staff') : '#');
+    const GATE_LABEL = qs.get('gate') || 'Scanner';
+
+    document.getElementById('staffLabel').textContent = STAFF_NAME;
+    document.getElementById('gateLabel').textContent = GATE_LABEL;
+    document.getElementById('backLink').href = BACK_URL;
+    document.getElementById('backLink').textContent = 'Back';
+    document.getElementById('helloText').textContent = `Hello, ${STAFF_NAME}`;
+
+    let qr = null;
+    let lastScanned = '';
+    let scanLock = false;
+
+    function setStatus(html) {
+      document.getElementById('statusBox').innerHTML = html;
+    }
+
+    function extractTicketId(qrText) {
+      const parts = String(qrText || '').split('|').map(s => s.trim());
+      return parts[2] || parts[0] || '';
+    }
+
+    function openPopup(type, title, line1, line2, line3, icon) {
+      const card = document.getElementById('popupCard');
+      card.className = 'popup-card ' + type;
+      document.getElementById('popupIcon').textContent = icon || '🎟️';
+      document.getElementById('popupTitle').textContent = title || '';
+      document.getElementById('popupLine1').textContent = line1 || '';
+      document.getElementById('popupLine2').textContent = line2 || '';
+      document.getElementById('popupLine3').textContent = line3 || '';
+      document.getElementById('popup').classList.add('show');
+    }
+
+    function closePopup() {
+      document.getElementById('popup').classList.remove('show');
+      if (!qr) startCamera();
+    }
+
+    function stopScanner() {
+      if (qr) {
+        qr.stop().catch(() => {}).finally(() => {
+          try { qr.clear(); } catch (e) {}
+          qr = null;
+          setStatus('<strong>Status:</strong> camera stopped');
+        });
+      }
+    }
+
+    async function startCamera() {
+      if (qr) return;
+      if (!window.Html5Qrcode) {
+        setStatus('<strong>Status:</strong> scanner library failed to load');
+        return;
+      }
+
+      try {
+        setStatus('<span class="spinner"></span> <strong>Starting camera…</strong>');
+        qr = new Html5Qrcode('reader');
+
+        const cameras = await Html5Qrcode.getCameras();
+        if (!cameras || !cameras.length) {
+          setStatus('<strong>Status:</strong> no camera found');
+          openPopup('invalid', 'No camera found', 'Please open this page on a phone with a camera.', '', '', '❌');
+          return;
+        }
+
+        const rear = cameras.find(c => /back|rear|environment/i.test(c.label));
+        const cameraId = rear ? rear.id : cameras[0].id;
+
+        await qr.start(
+          cameraId,
+          { fps: 10, qrbox: { width: 250, height: 250 }, aspectRatio: 1.0 },
+          onScanSuccess,
+          () => {}
+        );
+
+        setStatus('<strong>Status:</strong> camera ready');
+      } catch (err) {
+        console.error(err);
+        setStatus('<strong>Status:</strong> camera blocked or unavailable');
+        openPopup(
+          'invalid',
+          'Camera blocked',
+          'Open this page in Chrome or Safari, not inside an in-app browser.',
+          '',
+          '',
+          '❌'
+        );
+        try { if (qr) { await qr.clear(); } } catch (e) {}
+        qr = null;
+      }
+    }
+
+    function onScanSuccess(decodedText) {
+      if (scanLock || decodedText === lastScanned) return;
+      scanLock = true;
+      lastScanned = decodedText;
+      stopScanner();
+      const ticketId = extractTicketId(decodedText);
+      setStatus('<strong>Status:</strong> scanned ' + ticketId + ' — checking in…');
+      checkInTicket(ticketId);
+      setTimeout(() => { scanLock = false; }, 2000);
+    }
+
+    function jsonp(url) {
+      return new Promise((resolve, reject) => {
+        const cb = 'cb_' + Math.random().toString(36).slice(2);
+        const script = document.createElement('script');
+        const timeout = setTimeout(() => {
+          cleanup();
+          reject(new Error('Request timed out'));
+        }, 15000);
+
+        function cleanup() {
+          clearTimeout(timeout);
+          delete window[cb];
+          if (script.parentNode) script.parentNode.removeChild(script);
+        }
+
+        window[cb] = function(data) {
+          cleanup();
+          resolve(data);
+        };
+
+        script.onerror = function() {
+          cleanup();
+          reject(new Error('Network error'));
+        };
+
+        script.src = url + (url.includes('?') ? '&' : '?') + 'callback=' + encodeURIComponent(cb);
+        document.body.appendChild(script);
+      });
+    }
+
+    async function checkInTicket(ticketId) {
+      if (!API_BASE) {
+        setStatus('<strong>Status:</strong> missing Apps Script URL');
+        openPopup('invalid', 'Missing backend URL', 'Pass the Apps Script web app URL in the ?api= parameter.', '', '', '❌');
+        return;
+      }
+
+      try {
+        const url = API_BASE
+          + '?page=scanner-api'
+          + '&action=checkIn'
+          + '&ticketId=' + encodeURIComponent(ticketId)
+          + '&staffName=' + encodeURIComponent(STAFF_NAME)
+          + '&gateLabel=' + encodeURIComponent(GATE_LABEL);
+
+        const res = await jsonp(url);
+
+        if (res && res.success && res.status === 'VALID') {
+          setStatus('<strong>Status:</strong> <span style="color:#22c55e">valid ticket</span>');
+          openPopup(
+            'valid',
+            'Valid Ticket',
+            res.ticketId || ticketId,
+            'Checked in at ' + (res.checkedInTime || ''),
+            'By ' + STAFF_NAME,
+            '✅'
+          );
+        } else if (res && res.status === 'ALREADY_USED') {
+          setStatus('<strong>Status:</strong> <span style="color:#f59e0b">already used</span>');
+          openPopup(
+            'used',
+            'Already Used',
+            res.ticketId || ticketId,
+            'Checked in at ' + (res.checkedInTime || ''),
+            'By ' + (res.checkedInBy || ''),
+            '⚠️'
+          );
+        } else {
+          const msg = (res && res.error) ? res.error : 'Ticket not recognized.';
+          setStatus('<strong>Status:</strong> <span style="color:#ef4444">invalid</span>');
+          openPopup('invalid', 'Invalid Ticket', msg, '', '', '❌');
+        }
+      } catch (err) {
+        console.error(err);
+        setStatus('<strong>Status:</strong> <span style="color:#ef4444">connection error</span>');
+        openPopup('invalid', 'Connection Error', 'Could not reach the Apps Script backend.', '', '', '❌');
+      }
+    }
+
+    document.getElementById('startBtn').addEventListener('click', startCamera);
+    document.getElementById('stopBtn').addEventListener('click', stopScanner);
+
+    window.addEventListener('load', () => {
+      // Helpful if browser allows autoplay after a direct user tap.
+      setTimeout(() => {
+        setStatus('<strong>Status:</strong> tap “Start camera” if it does not open automatically');
+      }, 300);
+    });
+  </script>
+</body>
+</html>
