@@ -136,11 +136,28 @@
 
     #csvFileInput { padding: 10px; border: 1.5px dashed #ccc; border-radius: 8px; background: #fafafa; }
 
-    @media print {
-      body * { visibility: hidden; }
-      #printArea, #printArea * { visibility: visible; }
-      #printArea { position: absolute; top: 0; left: 0; width: 100%; }
-    }
+    #printArea {
+  display: none;
+}
+
+@media print {
+  body * {
+    visibility: hidden;
+  }
+
+  #printArea,
+  #printArea * {
+    visibility: visible;
+  }
+
+  #printArea {
+    display: block;
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+  }
+}
   </style>
 </head>
 <body>
