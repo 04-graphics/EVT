@@ -5,6 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>EventPass Scanner</title>
   <script src="js/html5-qrcode.min.js"></script>
+  <script src="js/api.js"></script>
   <style>
     :root{
       --bg:#0b1220; --panel:#101a2ecc; --panel2:#111827;
@@ -159,7 +160,6 @@
 
   <script>
     const qs = new URLSearchParams(location.search);
-    const API_BASE = qs.get('api') || '';
     const STAFF_NAME = qs.get('staff') || 'Scanner';
     const BACK_URL = qs.get('back') || 'staff.html';
     const GATE_LABEL = qs.get('gate') || 'Scanner';
@@ -265,130 +265,83 @@
       setTimeout(() => { scanLock = false; }, 2000);
     }
 
-    function jsonp(url) {
-      return new Promise((resolve, reject) => {
-        const cb = 'cb_' + Math.random().toString(36).slice(2);
-        const script = document.createElement('script');
-        const timeout = setTimeout(() => {
-          cleanup();
-          reject(new Error('Request timed out'));
-        }, 15000);
+    async function checkInTicket(ticketId) {
+      if (!ticketId) {
+        setStatus('<strong>Status:</strong> <span style="color:#ef4444">invalid ticket</span>');
+        openPopup('invalid', 'Invalid Ticket', 'No ticket ID found in the QR code.', '', '', '❌');
+        return;
+      }
 
-        function cleanup() {
-          clearTimeout(timeout);
-          delete window[cb];
-          if (script.parentNode) script.parentNode.removeChild(script);
+      if (typeof api !== 'function') {
+        setStatus('<strong>Status:</strong> scanner API helper failed to load');
+        openPopup('invalid', 'Scanner Error', 'The shared API helper is missing.', '', '', '❌');
+        return;
+      }
+
+      setStatus('<span class="spinner"></span> <strong>Checking ticket…</strong>');
+
+      try {
+        const res = await api('checkIn', {
+          ticketId,
+          staffName: STAFF_NAME,
+          gateLabel: GATE_LABEL
+        });
+
+        console.log('Scanner response:', res);
+
+        if (res && res.success && res.status === 'VALID') {
+          setStatus('<strong>Status:</strong> <span style="color:#22c55e">valid ticket</span>');
+          openPopup(
+            'valid',
+            'Valid Ticket',
+            res.ticketId || ticketId,
+            'Checked in at ' + (res.checkedInTime || ''),
+            'By ' + (res.checkedInBy || STAFF_NAME),
+            '✅'
+          );
+          return;
         }
 
-        window[cb] = function(data) {
-          cleanup();
-          resolve(data);
-        };
+        if (res && res.status === 'ALREADY_USED') {
+          setStatus('<strong>Status:</strong> <span style="color:#f59e0b">already used</span>');
+          openPopup(
+            'used',
+            'Already Used',
+            res.ticketId || ticketId,
+            'Checked in at ' + (res.checkedInTime || 'Unknown'),
+            'By ' + (res.checkedInBy || 'Unknown'),
+            '⚠️'
+          );
+          return;
+        }
 
-        script.onerror = function() {
-          cleanup();
-          reject(new Error('Network error'));
-        };
-
-        script.src = url + (url.includes('?') ? '&' : '?') + 'callback=' + encodeURIComponent(cb);
-        document.body.appendChild(script);
-      });
+        setStatus('<strong>Status:</strong> <span style="color:#ef4444">invalid ticket</span>');
+        openPopup(
+          'invalid',
+          'Invalid Ticket',
+          (res && res.error) || 'Ticket not recognized.',
+          '',
+          '',
+          '❌'
+        );
+      } catch (err) {
+        console.error(err);
+        setStatus('<strong>Status:</strong> <span style="color:#ef4444">connection error</span>');
+        openPopup(
+          'invalid',
+          'Connection Error',
+          'Could not reach the Apps Script backend.',
+          '',
+          '',
+          '❌'
+        );
+      }
     }
 
-    async function checkInTicket(ticketId) {
-  if (!API_BASE) {
-    setStatus('<strong>Status:</strong> missing Apps Script URL');
-    openPopup(
-      'invalid',
-      'Missing backend URL',
-      'Pass the Apps Script web app URL in the ?api= parameter.',
-      '',
-      '',
-      '❌'
-    );
-    return;
-  }
-
-  try {
-    const url =
-      API_BASE +
-      '?page=scanner-api' +
-      '&action=checkIn' +
-      '&ticketId=' + encodeURIComponent(ticketId) +
-      '&staffName=' + encodeURIComponent(STAFF_NAME) +
-      '&gateLabel=' + encodeURIComponent(GATE_LABEL);
-
-    const res = await jsonp(url);
-
-    console.log("Scanner response:", res);
-
-    // ---------------- VALID ----------------
-    if (res && res.status === "VALID") {
-
-      setStatus('<strong>Status:</strong> <span style="color:#22c55e">valid ticket</span>');
-
-      openPopup(
-        'valid',
-        'Valid Ticket',
-        res.ticketId || ticketId,
-        'Checked in at ' + (res.checkedInTime || ''),
-        'By ' + (res.checkedInBy || STAFF_NAME),
-        '✅'
-      );
-
-      return;
-    }
-
-    // ---------------- ALREADY USED ----------------
-    if (res && res.status === "ALREADY_USED") {
-
-      setStatus('<strong>Status:</strong> <span style="color:#f59e0b">already used</span>');
-
-      openPopup(
-        'used',
-        'Already Used',
-        res.ticketId || ticketId,
-        'Checked in at ' + (res.checkedInTime || 'Unknown'),
-        'By ' + (res.checkedInBy || 'Unknown'),
-        '⚠️'
-      );
-
-      return;
-    }
-
-    // ---------------- INVALID ----------------
-    setStatus('<strong>Status:</strong> <span style="color:#ef4444">invalid ticket</span>');
-
-    openPopup(
-      'invalid',
-      'Invalid Ticket',
-      res?.error || 'Ticket not recognized.',
-      '',
-      '',
-      '❌'
-    );
-
-  } catch (err) {
-
-    console.error(err);
-
-    setStatus('<strong>Status:</strong> <span style="color:#ef4444">connection error</span>');
-
-    openPopup(
-      'invalid',
-      'Connection Error',
-      'Could not reach the Apps Script backend.',
-      '',
-      '',
-      '❌'
-    );
-  }
-}
     document.getElementById('startBtn').addEventListener('click', startCamera);
     document.getElementById('stopBtn').addEventListener('click', stopScanner);
 
     window.addEventListener('load', () => {
-      // Helpful if browser allows autoplay after a direct user tap.
       setTimeout(() => {
         setStatus('<strong>Status:</strong> tap “Start camera” if it does not open automatically');
       }, 300);
