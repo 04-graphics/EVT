@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>EventPass Lite — Sign In</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+    }
+    .card {
+      background: #fff;
+      border-radius: 16px;
+      padding: 36px 28px;
+      width: 100%;
+      max-width: 380px;
+      box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+    }
+    .logo { text-align: center; margin-bottom: 24px; }
+    .logo h1 { font-size: 24px; color: #1a1a2e; font-weight: 700; }
+    .logo p { color: #888; font-size: 13px; margin-top: 4px; }
+    label {
+      display: block; font-size: 13px; font-weight: 600; color: #333;
+      margin-bottom: 6px; margin-top: 16px;
+    }
+    input {
+      width: 100%; padding: 12px 14px; border: 1.5px solid #e0e0e0;
+      border-radius: 10px; font-size: 15px; outline: none; transition: border 0.2s;
+    }
+    input:focus { border-color: #4f46e5; }
+    button {
+      width: 100%; margin-top: 24px; padding: 14px; background: #4f46e5;
+      color: #fff; border: none; border-radius: 10px; font-size: 15px;
+      font-weight: 600; cursor: pointer; transition: background 0.2s;
+    }
+    button:active { background: #3730a3; }
+    button:disabled { background: #aaa; }
+    .error {
+      background: #fee2e2; color: #b91c1c; padding: 10px 14px;
+      border-radius: 8px; font-size: 13px; margin-top: 16px; display: none;
+    }
+    .spinner { display: none; text-align: center; margin-top: 14px; color: #888; font-size: 13px; }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <div class="logo">
+      <h1>🎟️ EventPass Lite</h1>
+      <p>Sign in to continue</p>
+    </div>
+
+    <form id="loginForm">
+      <label>Email</label>
+      <input type="email" id="email" required autocomplete="username">
+
+      <label>Password</label>
+      <input type="password" id="password" required autocomplete="current-password">
+
+      <button type="submit" id="submitBtn">Sign In</button>
+    </form>
+
+    <div class="error" id="errorBox"></div>
+    <div class="spinner" id="spinner">Signing in…</div>
+  </div>
+
+  <script src="js/api.js"></script>
+  <script>
+    // If already logged in, skip straight to the right dashboard.
+    (function () {
+      const role = sessionStorage.getItem('ep_role');
+      if (role === 'Admin' || role === 'Super Admin') location.href = 'admin.html';
+      else if (role === 'Staff') location.href = 'staff.html';
+    })();
+
+    document.getElementById('loginForm').addEventListener('submit', handleLogin);
+
+    async function handleLogin(e) {
+      e.preventDefault();
+      const email = document.getElementById('email').value;
+      const password = document.getElementById('password').value;
+      const errorBox = document.getElementById('errorBox');
+      const spinner = document.getElementById('spinner');
+      const btn = document.getElementById('submitBtn');
+
+      errorBox.style.display = 'none';
+      spinner.style.display = 'block';
+      btn.disabled = true;
+
+      const res = await api('login', { email, password });
+
+      spinner.style.display = 'none';
+      btn.disabled = false;
+
+      if (res.success) {
+        sessionStorage.setItem('ep_role', res.role);
+        sessionStorage.setItem('ep_name', res.name);
+        sessionStorage.setItem('ep_id', res.id);
+
+        location.href = (res.role === 'Admin' || res.role === 'Super Admin')
+          ? 'admin.html'
+          : 'staff.html';
+      } else {
+        errorBox.textContent = res.error || 'Something went wrong. Try again.';
+        errorBox.style.display = 'block';
+      }
+    }
+  </script>
+</body>
+</html>

@@ -4,7 +4,7 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>EventPass Scanner</title>
-  <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
+  <script src="js/html5-qrcode.min.js"></script>
   <style>
     :root{
       --bg:#0b1220; --panel:#101a2ecc; --panel2:#111827;
@@ -161,7 +161,7 @@
     const qs = new URLSearchParams(location.search);
     const API_BASE = qs.get('api') || '';
     const STAFF_NAME = qs.get('staff') || 'Scanner';
-    const BACK_URL = qs.get('back') || (API_BASE ? (API_BASE + '?page=staff') : '#');
+    const BACK_URL = qs.get('back') || 'staff.html';
     const GATE_LABEL = qs.get('gate') || 'Scanner';
 
     document.getElementById('staffLabel').textContent = STAFF_NAME;

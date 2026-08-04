@@ -1,0 +1,841 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>EventPass Admin</title>
+  <script src="js/qrcode.min.js"></script>
+    <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: #f4f5f9;
+      color: #1a1a2e;
+    }
+    .header {
+      background: #1a1a2e;
+      color: #fff;
+      padding: 16px 20px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .header h2 { font-size: 17px; }
+    .header a { color: #f87171; font-size: 13px; text-decoration: none; }
+
+    .tabs {
+      display: flex;
+      overflow-x: auto;
+      background: #fff;
+      border-bottom: 1px solid #e5e5e5;
+    }
+    .tab {
+      padding: 14px 18px;
+      font-size: 13px;
+      font-weight: 600;
+      color: #888;
+      cursor: pointer;
+      white-space: nowrap;
+      border-bottom: 3px solid transparent;
+    }
+    .tab.active { color: #4f46e5; border-color: #4f46e5; }
+
+    .view { display: none; padding: 16px; }
+    .view.active { display: block; }
+
+    .cards {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+      margin-bottom: 16px;
+    }
+    .stat-card {
+      background: #fff;
+      border-radius: 12px;
+      padding: 16px;
+      text-align: center;
+      box-shadow: 0 1px 4px rgba(0,0,0,0.06);
+    }
+    .stat-card .num { font-size: 26px; font-weight: 800; }
+    .stat-card .label { font-size: 12px; color: #888; margin-top: 4px; }
+
+    .section {
+      background: #fff;
+      border-radius: 12px;
+      padding: 16px;
+      margin-bottom: 14px;
+      box-shadow: 0 1px 4px rgba(0,0,0,0.06);
+    }
+    .section h3 { font-size: 14px; margin-bottom: 10px; }
+
+    .bar-row { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; font-size: 12px; }
+    .bar-row .hour { width: 50px; color: #888; }
+    .bar-fill { background: #4f46e5; height: 16px; border-radius: 4px; }
+
+    .activity-item { display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid #f0f0f0; font-size: 13px; }
+    .activity-item:last-child { border: none; }
+
+    table { width: 100%; border-collapse: collapse; font-size: 13px; }
+    th, td { text-align: left; padding: 10px 6px; border-bottom: 1px solid #f0f0f0; }
+    th { color: #888; font-weight: 600; font-size: 11px; text-transform: uppercase; }
+    .badge { padding: 2px 8px; border-radius: 20px; font-size: 11px; font-weight: 600; }
+    .badge.unused { background: #d1fae5; color: #059669; }
+    .badge.used { background: #e5e7eb; color: #4b5563; }
+    .badge.active { background: #d1fae5; color: #059669; }
+    .badge.inactive { background: #fee2e2; color: #dc2626; }
+
+    input, select, textarea {
+      width: 100%;
+      padding: 10px 12px;
+      border: 1.5px solid #e0e0e0;
+      border-radius: 8px;
+      font-size: 14px;
+      margin-bottom: 10px;
+      outline: none;
+    }
+    input:focus, select:focus { border-color: #4f46e5; }
+    label { font-size: 12px; font-weight: 600; color: #555; display: block; margin-bottom: 4px; }
+
+    .btn {
+      padding: 11px 16px;
+      background: #4f46e5;
+      color: #fff;
+      border: none;
+      border-radius: 8px;
+      font-weight: 600;
+      font-size: 13px;
+      cursor: pointer;
+    }
+    .btn.secondary { background: #6b7280; }
+    .btn.danger { background: #dc2626; }
+    .btn.full { width: 100%; }
+    .btn-sm { padding: 6px 10px; font-size: 12px; border-radius: 6px; }
+
+    .row-actions { display: flex; gap: 6px; }
+    .search-bar { display: flex; gap: 8px; margin-bottom: 12px; }
+    .search-bar input { margin-bottom: 0; flex: 1; }
+
+    .modal-overlay {
+      position: fixed; inset: 0; background: rgba(0,0,0,0.5);
+      display: none; align-items: center; justify-content: center;
+      z-index: 999; padding: 20px;
+    }
+    .modal-overlay.active { display: flex; }
+    .modal {
+      background: #fff; border-radius: 14px; padding: 22px;
+      max-width: 400px; width: 100%; max-height: 85vh; overflow-y: auto;
+    }
+    .modal h3 { margin-bottom: 14px; }
+    .modal-close { float: right; cursor: pointer; font-size: 20px; color: #888; }
+
+    .ticket-preview {
+      border: 2px dashed #ccc; border-radius: 10px; padding: 16px;
+      text-align: center; margin-bottom: 10px;
+    }
+    .ticket-preview canvas { margin: 10px auto; }
+
+    #csvFileInput { padding: 10px; border: 1.5px dashed #ccc; border-radius: 8px; background: #fafafa; }
+
+    @media print {
+      body * { visibility: hidden; }
+      #printArea, #printArea * { visibility: visible; }
+      #printArea { position: absolute; top: 0; left: 0; width: 100%; }
+    }
+  </style>
+</head>
+<body>
+
+  <div class="header">
+    <h2>🎟️ EventPass Admin</h2>
+    <a href="#" onclick="logout()">Logout</a>
+  </div>
+
+  <div class="tabs">
+    <div class="tab active" data-tab="dashboardView" onclick="switchTab('dashboardView', this)">Dashboard</div>
+    <div class="tab" data-tab="guestsView" onclick="switchTab('guestsView', this)">Guests</div>
+    <div class="tab" data-tab="staffView" onclick="switchTab('staffView', this)">Staff</div>
+    <div class="tab" data-tab="logsView" onclick="switchTab('logsView', this)">Logs</div>
+    <div class="tab" data-tab="settingsView" onclick="switchTab('settingsView', this)">Settings</div>
+  </div>
+
+  <!-- DASHBOARD -->
+  <div class="view active" id="dashboardView">
+    <div class="cards" id="statCards"></div>
+
+    <div class="section">
+      <h3>Attendance Over Time</h3>
+      <div id="hourlyChart"></div>
+    </div>
+
+    <div class="section">
+      <h3>Recent Activity</h3>
+      <div id="recentActivity"></div>
+    </div>
+
+    <button class="btn full" onclick="exportCSV()">⬇ Export Attendance CSV</button>
+  </div>
+
+  <!-- GUESTS -->
+  <div class="view" id="guestsView">
+    <div class="search-bar">
+      <input id="guestSearch" placeholder="Search by name or ticket ID" oninput="renderGuests()">
+    </div>
+    <div style="display:flex; gap:8px; margin-bottom:12px; flex-wrap:wrap;">
+      <button class="btn" onclick="openModal('bulkGenerateModal')">+ Generate Blank Tickets</button>
+      <button class="btn" onclick="openModal('addGuestModal')">+ Add Named Ticket</button>
+      <button class="btn secondary" onclick="openModal('importModal')">Import CSV</button>
+      <button class="btn secondary" onclick="generateQrCache()">Generate QR Cache</button>
+      <button class="btn secondary" onclick="openModal('generateModal')">Print Tickets</button>
+    </div>
+    <div class="section" style="padding:0; overflow-x:auto;">
+      <table>
+        <thead><tr><th>Ticket</th><th>Name</th><th>Status</th><th></th></tr></thead>
+        <tbody id="guestsTableBody"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- STAFF -->
+  <div class="view" id="staffView">
+    <button class="btn" onclick="openModal('addStaffModal')" style="margin-bottom:12px;">+ Add Staff</button>
+    <div class="section" style="padding:0; overflow-x:auto;">
+      <table>
+        <thead><tr><th>Name</th><th>Email</th><th>Status</th><th></th></tr></thead>
+        <tbody id="staffTableBody"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- LOGS -->
+  <div class="view" id="logsView">
+    <div class="section" style="padding:0; overflow-x:auto;">
+      <table>
+        <thead><tr><th>Time</th><th>Staff</th><th>Action</th><th>Ticket</th></tr></thead>
+        <tbody id="logsTableBody"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- SETTINGS -->
+  <div class="view" id="settingsView">
+    <div class="section">
+      <h3>Event Settings</h3>
+      <label>Event Name</label>
+      <input id="setEventName">
+      <label>Venue</label>
+      <input id="setVenue">
+      <label>Date</label>
+      <input id="setDate" type="date">
+      <label>Organizer</label>
+      <input id="setOrganizer">
+      <label>Ticket Prefix</label>
+      <input id="setPrefix">
+      <label>Maximum Guests</label>
+      <input id="setMaxGuests" type="number">
+      <button class="btn full" onclick="saveSettings()">Save Settings</button>
+    </div>
+  </div>
+
+  <!-- MODAL: Bulk Generate Blank Tickets -->
+  <div class="modal-overlay" id="bulkGenerateModal">
+    <div class="modal">
+      <span class="modal-close" onclick="closeModal('bulkGenerateModal')">&times;</span>
+      <h3>Generate Blank Tickets</h3>
+      <p style="font-size:12px; color:#888; margin-bottom:10px;">Creates tickets with no name attached — for tickets sold physically at the door or through resellers. Each gets a unique Ticket ID and QR code.</p>
+      <label>How many tickets?</label>
+      <input id="bulkCount" type="number" placeholder="e.g. 130">
+      <button class="btn full" id="bulkGenerateBtn" onclick="submitBulkGenerate()">Generate</button>
+      <div id="bulkStatus" style="font-size:13px; margin-top:8px;"></div>
+    </div>
+  </div>
+
+  <!-- MODAL: Add Named Ticket -->
+  <div class="modal-overlay" id="addGuestModal">
+    <div class="modal">
+      <span class="modal-close" onclick="closeModal('addGuestModal')">&times;</span>
+      <h3>Add Named Ticket</h3>
+      <p style="font-size:12px; color:#888; margin-bottom:10px;">Use this if you already know who the ticket is for (e.g. VIP list, pre-registered guest).</p>
+      <label>Name</label>
+      <input id="newGuestName">
+      <label>Phone</label>
+      <input id="newGuestPhone">
+      <button class="btn full" id="addGuestBtn" onclick="submitAddGuest()">Create Ticket</button>
+    </div>
+  </div>
+
+  <!-- MODAL: Edit Guest -->
+  <div class="modal-overlay" id="editGuestModal">
+    <div class="modal">
+      <span class="modal-close" onclick="closeModal('editGuestModal')">&times;</span>
+      <h3>Edit Guest</h3>
+      <input type="hidden" id="editGuestTicketId">
+      <label>Name</label>
+      <input id="editGuestName">
+      <label>Phone</label>
+      <input id="editGuestPhone">
+      <button class="btn full" onclick="submitEditGuest()">Save Changes</button>
+    </div>
+  </div>
+
+  <!-- MODAL: Import CSV -->
+  <div class="modal-overlay" id="importModal">
+    <div class="modal">
+      <span class="modal-close" onclick="closeModal('importModal')">&times;</span>
+      <h3>Import Guests from CSV</h3>
+      <p style="font-size:12px; color:#888; margin-bottom:10px;">CSV format: <b>name,phone</b> — one guest per line. First row can be a header (it'll be skipped if it says "name").</p>
+      <input type="file" id="csvFileInput" accept=".csv">
+      <button class="btn full" id="importBtn" onclick="submitImport()" style="margin-top:10px;">Import</button>
+      <div id="importStatus" style="font-size:13px; margin-top:8px;"></div>
+    </div>
+  </div>
+
+  <!-- MODAL: Generate Tickets -->
+  <div class="modal-overlay" id="generateModal">
+    <div class="modal">
+      <span class="modal-close" onclick="closeModal('generateModal')">&times;</span>
+      <h3>Generate Ticket</h3>
+      <label>Select Ticket</label>
+      <select id="ticketGuestSelect"></select>
+      <div class="ticket-preview" id="ticketPreview"></div>
+      <button class="btn full" onclick="printTicket()">🖨 Print This Ticket</button>
+      <button class="btn full secondary" style="margin-top:8px;" onclick="generateAllTickets()">Print All Unused Tickets</button>
+    </div>
+  </div>
+
+  <!-- MODAL: Add Staff -->
+  <div class="modal-overlay" id="addStaffModal">
+    <div class="modal">
+      <span class="modal-close" onclick="closeModal('addStaffModal')">&times;</span>
+      <h3>Add Staff Member</h3>
+      <label>Name</label>
+      <input id="newStaffName">
+      <label>Email</label>
+      <input id="newStaffEmail" type="email">
+      <label>Temporary Password</label>
+      <input id="newStaffPassword">
+      <button class="btn full" id="addStaffBtn" onclick="submitAddStaff()">Add Staff</button>
+    </div>
+  </div>
+
+  <!-- MODAL: Reset Staff Password -->
+  <div class="modal-overlay" id="resetPwModal">
+    <div class="modal">
+      <span class="modal-close" onclick="closeModal('resetPwModal')">&times;</span>
+      <h3>Reset Password</h3>
+      <input type="hidden" id="resetPwUserId">
+      <label>New Password</label>
+      <input id="resetPwNew">
+      <button class="btn full" onclick="submitResetPassword()">Reset Password</button>
+    </div>
+  </div>
+
+  <!-- Hidden print area -->
+  <div id="printArea" style="display:none;"></div>
+
+  <script src="js/api.js"></script>
+  <script>
+    let allGuests = [];
+    let allStaff = [];
+    let eventSettings = {};
+
+    function qrDataUrl(text, size) {
+      return QRCode.toDataURL(String(text || ''), {
+        errorCorrectionLevel: 'M',
+        margin: 1,
+        width: size
+      });
+    }
+
+    function waitForImages(container) {
+      const imgs = Array.from(container.querySelectorAll('img'));
+      if (!imgs.length) return Promise.resolve();
+      return Promise.all(imgs.map(img => {
+        if (img.complete && img.naturalWidth > 0) return Promise.resolve();
+        return new Promise(resolve => {
+          img.onload = () => resolve();
+          img.onerror = () => resolve();
+        });
+      }));
+    }
+
+    window.onload = function() {
+      const role = sessionStorage.getItem('ep_role');
+      if (role !== 'Admin' && role !== 'Super Admin') {
+        location.href = 'index.html';
+        return;
+      }
+      loadEverything();
+    };
+
+    function logout() {
+      sessionStorage.clear();
+      location.href = 'index.html';
+    }
+
+    async function loadEverything() {
+      const [statsRes, guestsRes, staffRes, logsRes, settingsRes] = await Promise.all([
+        api('getDashboardStats'),
+        api('getGuests'),
+        api('getStaff'),
+        api('getLogs'),
+        api('getSettings')
+      ]);
+
+      if (statsRes.success) renderStats(statsRes.data);
+      else showLoadError('dashboard stats', statsRes);
+
+      if (guestsRes.success) { allGuests = guestsRes.data; renderGuests(); populateTicketSelect(); }
+      else showLoadError('guest list', guestsRes);
+
+      if (staffRes.success) { allStaff = staffRes.data; renderStaff(); }
+      else showLoadError('staff list', staffRes);
+
+      if (logsRes.success) renderLogs(logsRes.data);
+      else showLoadError('logs', logsRes);
+
+      if (settingsRes.success) { eventSettings = settingsRes.data; fillSettingsForm(); }
+      else showLoadError('settings', settingsRes);
+    }
+
+    function showLoadError(what, err) {
+      console.error(what, err);
+      const detail = err && err.error ? err.error : '';
+      const banner = document.getElementById('loadErrorBanner') || (() => {
+        const b = document.createElement('div');
+        b.id = 'loadErrorBanner';
+        b.style.cssText = 'background:#fee2e2;color:#b91c1c;padding:10px 16px;font-size:13px;white-space:pre-wrap;';
+        document.body.insertBefore(b, document.body.firstChild.nextSibling);
+        return b;
+      })();
+      banner.textContent = `⚠ Couldn't load ${what}. ${detail}`;
+    }
+
+    function switchTab(id, el) {
+      document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
+      document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+      document.getElementById(id).classList.add('active');
+      el.classList.add('active');
+      if (id === 'dashboardView') loadEverything();
+    }
+
+    function openModal(id) { document.getElementById(id).classList.add('active'); }
+    function closeModal(id) { document.getElementById(id).classList.remove('active'); }
+
+    // ---------- DASHBOARD ----------
+    function renderStats(d) {
+      document.getElementById('statCards').innerHTML = `
+        <div class="stat-card"><div class="num">${d.total}</div><div class="label">Total Tickets</div></div>
+        <div class="stat-card"><div class="num">${d.checkedIn}</div><div class="label">Checked In</div></div>
+        <div class="stat-card"><div class="num">${d.remaining}</div><div class="label">Remaining</div></div>
+        <div class="stat-card"><div class="num">${d.invalidAttempts}</div><div class="label">Invalid Attempts</div></div>
+      `;
+
+      const hours = Object.keys(d.hourly).sort();
+      const max = Math.max(...Object.values(d.hourly), 1);
+      document.getElementById('hourlyChart').innerHTML = hours.length ? hours.map(h => `
+        <div class="bar-row">
+          <div class="hour">${h}</div>
+          <div class="bar-fill" style="width:${(d.hourly[h]/max*100)}%"></div>
+          <div>${d.hourly[h]}</div>
+        </div>
+      `).join('') : '<p style="color:#888; font-size:13px;">No check-ins yet.</p>';
+
+      document.getElementById('recentActivity').innerHTML = d.recent.length ? d.recent.map(r => `
+        <div class="activity-item">
+          <span>${r.name}</span>
+          <span style="color:#888;">${r.time} · ${r.by}</span>
+        </div>
+      `).join('') : '<p style="color:#888; font-size:13px;">No activity yet.</p>';
+    }
+
+    async function exportCSV() {
+      const res = await api('exportAttendanceCsv');
+      if (!res.success) return alert('❌ ' + (res.error || 'Could not export CSV.'));
+      const blob = new Blob([res.csv], { type: 'text/csv' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'attendance.csv';
+      a.click();
+      URL.revokeObjectURL(url);
+    }
+
+    // ---------- GUESTS ----------
+    function renderGuests() {
+      if (!allGuests) { showLoadError('guest list', { error: 'Server returned an empty response — check your connection and try again.' }); return; }
+      const q = (document.getElementById('guestSearch').value || '').toLowerCase();
+      const filtered = allGuests.filter(g =>
+        String(g.Name).toLowerCase().includes(q) || String(g['Ticket ID']).toLowerCase().includes(q)
+      );
+      document.getElementById('guestsTableBody').innerHTML = filtered.map(g => `
+        <tr>
+          <td>${g['Ticket ID']}</td>
+          <td>${g.Name || '<span style="color:#aaa;">—</span>'}</td>
+          <td><span class="badge ${g.Status === 'Used' ? 'used' : 'unused'}">${g.Status}</span></td>
+          <td>
+            <div class="row-actions">
+              <button class="btn btn-sm secondary" onclick="openEditGuest('${g['Ticket ID']}')">Edit</button>
+              ${g.Status === 'Used' ? `<button class="btn btn-sm" onclick="resetTicketAction('${g['Ticket ID']}')">Reset</button>` : ''}
+              <button class="btn btn-sm danger" onclick="deleteGuestAction('${g['Ticket ID']}')">Del</button>
+            </div>
+          </td>
+        </tr>
+      `).join('');
+    }
+
+    async function submitAddGuest() {
+      const name = document.getElementById('newGuestName').value.trim();
+      const phone = document.getElementById('newGuestPhone').value.trim();
+      if (!name) return alert('Name is required.');
+
+      const btn = document.getElementById('addGuestBtn');
+      btn.disabled = true;
+      btn.textContent = 'Creating...';
+
+      const res = await api('generateTicket', { name, phone });
+
+      btn.disabled = false;
+      btn.textContent = 'Create Ticket';
+
+      if (res.success) {
+        closeModal('addGuestModal');
+        document.getElementById('newGuestName').value = '';
+        document.getElementById('newGuestPhone').value = '';
+        loadEverything();
+      } else {
+        alert('❌ ' + res.error);
+      }
+    }
+
+    async function submitBulkGenerate() {
+      const count = parseInt(document.getElementById('bulkCount').value, 10);
+      if (!count || count < 1) return alert('Enter a valid number of tickets.');
+      if (count > 500) return alert('For batches this large, generate in smaller chunks (e.g. 200 at a time).');
+
+      const btn = document.getElementById('bulkGenerateBtn');
+      btn.disabled = true;
+      btn.textContent = 'Generating...';
+      document.getElementById('bulkStatus').textContent = `Generating ${count} tickets...`;
+
+      const res = await api('generateBlankTickets', { count });
+
+      btn.disabled = false;
+      btn.textContent = 'Generate';
+
+      if (res.success) {
+        document.getElementById('bulkStatus').textContent = `✅ Generated ${res.count} blank tickets.`;
+        document.getElementById('bulkCount').value = '';
+        loadEverything();
+      } else {
+        document.getElementById('bulkStatus').textContent = `❌ ${res.error}`;
+      }
+    }
+
+    function openEditGuest(ticketId) {
+      const g = allGuests.find(x => x['Ticket ID'] === ticketId);
+      document.getElementById('editGuestTicketId').value = ticketId;
+      document.getElementById('editGuestName').value = g.Name;
+      document.getElementById('editGuestPhone').value = g.Phone;
+      openModal('editGuestModal');
+    }
+
+    async function submitEditGuest() {
+      const ticketId = document.getElementById('editGuestTicketId').value;
+      const name = document.getElementById('editGuestName').value.trim();
+      const phone = document.getElementById('editGuestPhone').value.trim();
+      const res = await api('editGuest', { ticketId, name, phone });
+      if (res.success) { closeModal('editGuestModal'); loadEverything(); }
+      else alert(res.error);
+    }
+
+    async function deleteGuestAction(ticketId) {
+      if (!confirm('Delete this guest? This cannot be undone.')) return;
+      const res = await api('deleteGuest', { ticketId });
+      if (res.success) loadEverything(); else alert(res.error);
+    }
+
+    async function resetTicketAction(ticketId) {
+      if (!confirm('Reset this ticket to Unused?')) return;
+      const adminName = sessionStorage.getItem('ep_name');
+      const res = await api('resetTicket', { ticketId, adminName });
+      if (res.success) loadEverything(); else alert(res.error);
+    }
+
+    // ---------- CSV IMPORT ----------
+    function submitImport() {
+      const file = document.getElementById('csvFileInput').files[0];
+      if (!file) return alert('Choose a CSV file first.');
+
+      const btn = document.getElementById('importBtn');
+      btn.disabled = true;
+      btn.textContent = 'Importing...';
+
+      const reader = new FileReader();
+      reader.onload = async function(e) {
+        const lines = e.target.result.split(/\r?\n/).filter(l => l.trim());
+        const guests = [];
+        lines.forEach((line, i) => {
+          const parts = line.split(',').map(p => p.trim().replace(/^"|"$/g, ''));
+          if (i === 0 && /name/i.test(parts[0])) return; // skip header
+          if (parts[0]) guests.push({ name: parts[0], phone: parts[1] || '' });
+        });
+        document.getElementById('importStatus').textContent = `Importing ${guests.length} guests...`;
+
+        const res = await api('importGuests', { guests });
+
+        btn.disabled = false;
+        btn.textContent = 'Import';
+
+        if (res.success) {
+          document.getElementById('importStatus').textContent = `✅ Imported ${res.count} guests.`;
+          loadEverything();
+        } else {
+          document.getElementById('importStatus').textContent = `❌ Something went wrong. Please try again.`;
+        }
+      };
+      reader.readAsText(file);
+    }
+
+    // ---------- TICKET GENERATION ----------
+    function populateTicketSelect() {
+      if (!allGuests) return; // guest list failed to load — renderGuests() already surfaced the error
+      const sel = document.getElementById('ticketGuestSelect');
+      sel.innerHTML = allGuests.map(g => `<option value="${g['Ticket ID']}">${g['Ticket ID']}${g.Name ? ' — ' + g.Name : ''}</option>`).join('');
+      sel.onchange = renderTicketPreview;
+      if (allGuests.length) renderTicketPreview();
+    }
+
+    function makeQrPayload(ticketId) {
+      const num = parseInt(String(ticketId).replace(/\D/g, ''), 10);
+      const eventName = eventSettings?.EventName || 'Pool Party Event Pass';
+      let ticketType = 'General Ticket';
+      if (num >= 1 && num <= 70) {
+        ticketType = 'Male Ticket';
+      } else if (num >= 71 && num <= 130) {
+        ticketType = 'Female Ticket';
+      }
+      return `${eventName} | ${ticketType} | ${ticketId}`;
+    }
+
+    async function renderTicketPreview() {
+      const ticketId = document.getElementById('ticketGuestSelect').value;
+      const g = allGuests.find(x => x['Ticket ID'] === ticketId);
+      if (!g) return;
+
+      const eventName =
+        (eventSettings && eventSettings.EventName)
+          ? eventSettings.EventName
+          : 'Pool Party Event Pass';
+
+      const preview = document.getElementById('ticketPreview');
+      const payload = g['QR Payload'] || makeQrPayload(ticketId);
+
+      preview.innerHTML = `<div style="font-size:13px;color:#666;">Generating QR…</div>`;
+
+      try {
+        const qrSrc = await qrDataUrl(payload, 160);
+        preview.innerHTML = `
+          <div style="font-weight:700;font-size:15px;">${eventName}</div>
+          <div style="font-size:13px; color:#666; margin-bottom:8px;">${g.Name || 'Admit One'}</div>
+          <img src="${qrSrc}" alt="QR code for ${g['Ticket ID']}" style="display:block;margin:10px auto;width:160px;height:160px;">
+          <div style="font-size:12px; color:#888; margin-top:6px;">${g['Ticket ID']}</div>
+        `;
+      } catch (err) {
+        console.error(err);
+        preview.innerHTML = `<div style="color:#dc2626;font-size:13px;">Could not generate QR preview.</div>`;
+      }
+    }
+
+    async function printTicket() {
+      const ticketId = document.getElementById('ticketGuestSelect').value;
+      const g = allGuests.find(x => x['Ticket ID'] === ticketId);
+      if (!g) return alert('No ticket selected.');
+      await buildPrintArea([g]);
+    }
+
+    async function generateAllTickets() {
+      const unused = allGuests.filter(g => g.Status !== 'Used');
+      if (!unused.length) return alert('No unused tickets to generate.');
+      await buildPrintArea(unused);
+    }
+
+    async function buildPrintArea(guests) {
+      const area = document.getElementById('printArea');
+      const cards = [];
+
+      for (const g of guests) {
+        const ticketId = g['Ticket ID'];
+        const eventName =
+          (eventSettings && eventSettings.EventName)
+            ? eventSettings.EventName
+            : 'Pool Party Event Pass';
+
+        const payload = g['QR Payload'] || makeQrPayload(ticketId);
+        const qrSrc = await qrDataUrl(payload, 200);
+
+        cards.push(`
+          <div style="page-break-after:always; text-align:center; padding:40px; font-family:sans-serif;">
+            <h2>${eventName}</h2>
+            <p style="color:#666;">
+              ${eventSettings && eventSettings.Venue ? eventSettings.Venue : ''}
+              ${eventSettings && eventSettings.Date ? '· ' + eventSettings.Date : ''}
+            </p>
+            <h3 style="margin-top:20px;">${g.Name || 'Admit One'}</h3>
+            <img
+              src="${qrSrc}"
+              alt="QR code for ${ticketId}"
+              style="display:block;margin:20px auto;width:200px;height:200px;">
+            <p>${ticketId}</p>
+          </div>
+        `);
+      }
+
+      area.innerHTML = cards.join('');
+      await waitForImages(area);
+      await new Promise(resolve => setTimeout(resolve, 100));
+      window.print();
+    }
+
+    async function generateQrCache() {
+      const btn = document.querySelector("button[onclick='generateQrCache()']");
+      if (btn) {
+        btn.disabled = true;
+        btn.textContent = 'Generating...';
+      }
+
+      const res = await api('generateQrCache');
+
+      if (btn) {
+        btn.disabled = false;
+        btn.textContent = 'Generate QR Cache';
+      }
+
+      if (res.success) {
+        alert('✅ Generated QR cache for ' + res.count + ' guests.');
+        loadEverything();
+      } else {
+        alert('❌ ' + (res.error || 'Could not generate QR cache.'));
+      }
+    }
+
+    // ---------- STAFF ----------
+    function renderStaff() {
+      document.getElementById('staffTableBody').innerHTML = allStaff.map(s => `
+        <tr>
+          <td>${s.Name}</td>
+          <td>${s.Email}</td>
+          <td><span class="badge ${s.Active === true || s.Active === 'TRUE' ? 'active' : 'inactive'}">${s.Active === true || s.Active === 'TRUE' ? 'Active' : 'Disabled'}</span></td>
+          <td>
+            <div class="row-actions">
+              <button class="btn btn-sm secondary" onclick="toggleStaff('${s.ID}', ${!(s.Active === true || s.Active === 'TRUE')})">${s.Active === true || s.Active === 'TRUE' ? 'Disable' : 'Enable'}</button>
+              <button class="btn btn-sm" onclick="openResetPassword('${s.ID}')">Reset PW</button>
+              <button class="btn btn-sm danger" onclick="removeStaff('${s.ID}', '${s.Name.replace(/'/g, "\\'")}')">Remove</button>
+            </div>
+          </td>
+        </tr>
+      `).join('');
+    }
+
+    async function removeStaff(id, name) {
+      const confirmed = confirm(
+        `Remove ${name}?\n\n` +
+        `This permanently deletes their login. They will no longer be able to sign in, ` +
+        `and this cannot be undone.\n\nAny check-ins they've already logged will stay in the records.`
+      );
+      if (!confirmed) return;
+
+      const res = await api('deleteStaff', { id });
+
+      if (res.success) {
+        alert('Staff member removed.');
+        loadEverything();
+      } else {
+        alert('❌ Could not remove staff: ' + res.error);
+      }
+    }
+
+    async function submitAddStaff() {
+      const name = document.getElementById('newStaffName').value.trim();
+      const email = document.getElementById('newStaffEmail').value.trim();
+      const pw = document.getElementById('newStaffPassword').value;
+      if (!name || !email || !pw) return alert('All fields required.');
+
+      const btn = document.getElementById('addStaffBtn');
+      btn.disabled = true;
+      btn.textContent = 'Adding...';
+
+      const res = await api('addStaff', { name, email, password: pw });
+
+      btn.disabled = false;
+      btn.textContent = 'Add Staff';
+
+      if (res.success) {
+        alert('✅ Staff member added successfully.');
+        closeModal('addStaffModal');
+        document.getElementById('newStaffName').value = '';
+        document.getElementById('newStaffEmail').value = '';
+        document.getElementById('newStaffPassword').value = '';
+        loadEverything();
+      } else {
+        alert('❌ Could not add staff: ' + res.error);
+      }
+    }
+
+    async function toggleStaff(id, newState) {
+      const res = await api('toggleStaffActive', { id, active: newState });
+      if (res.success) loadEverything(); else alert(res.error);
+    }
+
+    function openResetPassword(id) {
+      document.getElementById('resetPwUserId').value = id;
+      document.getElementById('resetPwNew').value = '';
+      openModal('resetPwModal');
+    }
+
+    async function submitResetPassword() {
+      const id = document.getElementById('resetPwUserId').value;
+      const pw = document.getElementById('resetPwNew').value;
+      if (!pw) return alert('Enter a new password.');
+      const res = await api('resetStaffPassword', { id, password: pw });
+      if (res.success) { closeModal('resetPwModal'); alert('Password reset.'); }
+      else alert(res.error);
+    }
+
+    // ---------- LOGS ----------
+    function renderLogs(logs) {
+      if (!logs) { showLoadError('logs', { error: 'Server returned an empty response — check your connection and try again.' }); return; }
+      document.getElementById('logsTableBody').innerHTML = logs.slice(0, 100).map(l => `
+        <tr>
+          <td>${l.Time}</td>
+          <td>${l.Staff}</td>
+          <td>${l.Action}</td>
+          <td>${l.Ticket || '—'}</td>
+        </tr>
+      `).join('');
+    }
+
+    // ---------- SETTINGS ----------
+    function fillSettingsForm() {
+      document.getElementById('setEventName').value = eventSettings.EventName || '';
+      document.getElementById('setVenue').value = eventSettings.Venue || '';
+      document.getElementById('setDate').value = eventSettings.Date || '';
+      document.getElementById('setOrganizer').value = eventSettings.Organizer || '';
+      document.getElementById('setPrefix').value = eventSettings.TicketPrefix || 'EVT';
+      document.getElementById('setMaxGuests').value = eventSettings.MaxGuests || '';
+    }
+
+    async function saveSettings() {
+      const settings = {
+        EventName: document.getElementById('setEventName').value,
+        Venue: document.getElementById('setVenue').value,
+        Date: document.getElementById('setDate').value,
+        Organizer: document.getElementById('setOrganizer').value,
+        TicketPrefix: document.getElementById('setPrefix').value,
+        MaxGuests: document.getElementById('setMaxGuests').value
+      };
+      const res = await api('updateSettings', { settings });
+      if (res.success) { alert('Settings saved.'); loadEverything(); }
+    }
+  </script>
+</body>
+</html>

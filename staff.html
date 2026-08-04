@@ -1,0 +1,397 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>EventPass Staff</title>
+  <script src="js/html5-qrcode.min.js"></script>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: #16213e;
+      min-height: 100vh;
+      color: #fff;
+    }
+    .header {
+      padding: 18px 20px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      background: #1a1a2e;
+    }
+    .header h2 { font-size: 17px; }
+    .header .staffname { font-size: 12px; color: #aaa; }
+    .logout { color: #f87171; font-size: 13px; text-decoration: none; }
+
+    .menu {
+      padding: 24px 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+    .menu button {
+      padding: 28px 20px;
+      font-size: 19px;
+      font-weight: 700;
+      border: none;
+      border-radius: 16px;
+      cursor: pointer;
+      color: #fff;
+    }
+    .btn-scan { background: #4f46e5; }
+    .btn-search { background: #059669; }
+    .btn-manual { background: #d97706; }
+
+    .view { display: none; padding: 16px; }
+    .view.active { display: block; }
+
+    #reader { width: 100%; border-radius: 12px; overflow: hidden; margin-top: 10px; }
+    .back-btn {
+      background: none;
+      border: 1px solid #555;
+      color: #fff;
+      padding: 8px 14px;
+      border-radius: 8px;
+      font-size: 13px;
+      cursor: pointer;
+      margin-bottom: 14px;
+    }
+
+    .search-input {
+      width: 100%;
+      padding: 14px;
+      font-size: 16px;
+      border-radius: 10px;
+      border: none;
+      margin-bottom: 14px;
+    }
+    .result-card {
+      background: #1e2a4a;
+      border-radius: 12px;
+      padding: 16px;
+      margin-bottom: 10px;
+    }
+    .result-card .name { font-size: 17px; font-weight: 700; }
+    .result-card .ticket { color: #93c5fd; font-size: 13px; margin: 4px 0; }
+    .result-card .status { font-size: 13px; padding: 3px 10px; border-radius: 20px; display: inline-block; }
+    .status.unused { background: #059669; }
+    .status.used { background: #6b7280; }
+    .checkin-btn {
+      margin-top: 10px;
+      width: 100%;
+      padding: 12px;
+      background: #4f46e5;
+      color: #fff;
+      border: none;
+      border-radius: 8px;
+      font-weight: 700;
+      cursor: pointer;
+    }
+    .checkin-btn:disabled { background: #4b5563; }
+
+    .popup {
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.7);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      z-index: 999;
+      padding: 20px;
+    }
+    .popup.active { display: flex; }
+    .popup-card {
+      background: #fff;
+      color: #1a1a2e;
+      border-radius: 16px;
+      padding: 28px;
+      max-width: 340px;
+      width: 100%;
+      text-align: center;
+    }
+    .popup-card.valid { border-top: 8px solid #059669; }
+    .popup-card.used { border-top: 8px solid #d97706; }
+    .popup-card.invalid { border-top: 8px solid #dc2626; }
+    .popup-icon { font-size: 40px; margin-bottom: 8px; }
+    .popup-card h3 { font-size: 20px; margin-bottom: 6px; }
+    .popup-card p { color: #666; font-size: 14px; margin: 2px 0; }
+    .popup-close {
+      margin-top: 18px;
+      width: 100%;
+      padding: 12px;
+      background: #1a1a2e;
+      color: #fff;
+      border: none;
+      border-radius: 8px;
+      font-weight: 600;
+      cursor: pointer;
+    }
+  </style>
+</head>
+<body>
+
+  <div class="header">
+    <div>
+      <h2>Staff Panel</h2>
+      <div class="staffname" id="staffNameLabel"></div>
+    </div>
+    <a class="logout" href="#" onclick="logout()">Logout</a>
+  </div>
+
+  <!-- MAIN MENU -->
+  <div class="view active" id="menuView">
+    <div class="menu">
+      <button class="btn-scan" onclick="openScannerPage()">📷 SCAN QR</button>
+      <button class="btn-search" onclick="showView('searchView')">🔍 SEARCH TICKET</button>
+      <button class="btn-manual" onclick="showView('manualView')">✍️ MANUAL CHECK-IN</button>
+    </div>
+  </div>
+
+  <!-- SCAN VIEW -->
+  <div class="view" id="scanView">
+    <button class="back-btn" onclick="showView('menuView')">← Back</button>
+    <div style="background:#1e2a4a;border-radius:18px;padding:18px;line-height:1.6;">
+      <h3 style="font-size:18px;margin-bottom:8px;">Scanner opens in a new tab</h3>
+      <p style="color:#cbd5e1;font-size:13px;">This keeps camera access working on phones. Open the scanner, then return here for search or manual check-in.</p>
+      <button class="btn-scan" style="margin-top:14px;width:100%;padding:16px 18px;border-radius:14px;" onclick="openScannerPage()">Open Scanner</button>
+    </div>
+  </div>
+
+  <!-- SEARCH VIEW -->
+  <div class="view" id="searchView">
+    <button class="back-btn" onclick="showView('menuView')">← Back</button>
+    <input class="search-input" id="searchInput" placeholder="Ticket ID" oninput="doSearch()">
+    <div id="searchResults"></div>
+  </div>
+
+  <!-- MANUAL CHECK-IN VIEW -->
+  <div class="view" id="manualView">
+    <button class="back-btn" onclick="showView('menuView')">← Back</button>
+    <input class="search-input" id="manualInput" placeholder="Ticket ID" oninput="doManualSearch()">
+    <div id="manualResults"></div>
+  </div>
+
+  <!-- RESULT POPUP -->
+  <div class="popup" id="popup">
+    <div class="popup-card" id="popupCard">
+      <div class="popup-icon" id="popupIcon"></div>
+      <h3 id="popupTitle"></h3>
+      <p id="popupLine1"></p>
+      <p id="popupLine2"></p>
+      <button class="popup-close" onclick="closePopup()">Close</button>
+    </div>
+  </div>
+
+  <script src="js/api.js"></script>
+  <script>
+    let staffName = '';
+    let html5QrCode = null;
+
+    window.onload = function() {
+      staffName = sessionStorage.getItem('ep_name');
+      const role = sessionStorage.getItem('ep_role');
+      if (!staffName || (role !== 'Staff' && role !== 'Admin' && role !== 'Super Admin')) {
+        location.href = 'index.html';
+        return;
+      }
+      document.getElementById('staffNameLabel').textContent = staffName;
+    };
+
+    function logout() {
+      sessionStorage.clear();
+      location.href = 'index.html';
+    }
+
+    function showView(id) {
+      document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
+      document.getElementById(id).classList.add('active');
+    }
+
+    function openScannerPage() {
+      // scanner.html is a separate GitHub Pages file (deployed alongside this one).
+      // It talks to the Apps Script API directly via its own ?api= param.
+      const scannerUrl = 'scanner.html';
+      const api = getApiUrl();
+      const staff = sessionStorage.getItem('ep_name') || '';
+      const back = 'staff.html';
+
+      const url = scannerUrl
+        + '?api=' + encodeURIComponent(api)
+        + '&staff=' + encodeURIComponent(staff)
+        + '&back=' + encodeURIComponent(back)
+        + '&gate=' + encodeURIComponent('Scanner');
+
+      location.href = url;
+    }
+
+    // ---------- IN-PAGE SCANNER (fallback; normally unused since
+    // "SCAN QR" opens scanner.html in-place via openScannerPage()) ----------
+    async function startScanner() {
+      try {
+        if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+          alert("This browser doesn't support camera access.");
+          return;
+        }
+
+        if (html5QrCode) {
+          try { await html5QrCode.stop(); } catch (e) {}
+          try { await html5QrCode.clear(); } catch (e) {}
+          html5QrCode = null;
+        }
+
+        html5QrCode = new Html5Qrcode("reader");
+
+        const cameras = await Html5Qrcode.getCameras();
+        if (!cameras || !cameras.length) {
+          alert("No camera found.");
+          return;
+        }
+
+        const back =
+          cameras.find(c => /back|rear|environment/i.test(c.label));
+        const cameraId = back ? back.id : cameras[0].id;
+
+        await html5QrCode.start(
+          cameraId,
+          {
+            fps: 10,
+            qrbox: 250,
+            aspectRatio: 1.0
+          },
+          onScanSuccess,
+          () => {}
+        );
+
+      } catch (err) {
+        console.error(err);
+        alert(
+          "Camera permission was denied or blocked.\n\n" +
+          "If you're using an in-app browser, open this page in Chrome or Safari."
+        );
+      }
+    }
+
+    function stopScanner() {
+      if (html5QrCode) {
+        html5QrCode.stop().catch(()=>{});
+      }
+    }
+
+    let lastScanned = '';
+    let scanLock = false;
+    function extractTicketId(qrText) {
+      const parts = String(qrText || '').split('|').map(p => p.trim());
+      return parts[2] || parts[0] || '';
+    }
+
+    function onScanSuccess(decodedText) {
+      if (scanLock || decodedText === lastScanned) return;
+      scanLock = true;
+      lastScanned = decodedText;
+      stopScanner();
+      submitCheckIn(extractTicketId(decodedText), null);
+      setTimeout(() => { scanLock = false; }, 2000);
+    }
+
+    // ---------- CHECK-IN SUBMISSION ----------
+    async function submitCheckIn(ticketId, gateLabel) {
+      const res = await api('checkIn', { ticketId, staffName, gateLabel });
+      showResult(res);
+    }
+
+    function showResult(res) {
+      const popup = document.getElementById('popup');
+      const card = document.getElementById('popupCard');
+      const icon = document.getElementById('popupIcon');
+      const title = document.getElementById('popupTitle');
+      const l1 = document.getElementById('popupLine1');
+      const l2 = document.getElementById('popupLine2');
+
+      card.className = 'popup-card';
+      if (res.status === 'VALID') {
+        card.classList.add('valid');
+        icon.textContent = '✅';
+        title.textContent = 'Valid Ticket';
+        l1.textContent = res.ticketId;
+        l2.textContent = 'Checked in at ' + res.checkedInTime;
+      } else if (res.status === 'ALREADY_USED') {
+        card.classList.add('used');
+        icon.textContent = '⚠️';
+        title.textContent = 'Already Used';
+        l1.textContent = res.ticketId;
+        l2.textContent = 'Checked in at ' + res.checkedInTime + ' · By ' + res.checkedInBy;
+      } else {
+        card.classList.add('invalid');
+        icon.textContent = '❌';
+        title.textContent = 'Invalid Ticket';
+        l1.textContent = res.error || 'Ticket ID not recognized.';
+        l2.textContent = '';
+      }
+      popup.classList.add('active');
+    }
+
+    function closePopup() {
+      document.getElementById('popup').classList.remove('active');
+      showView('menuView');
+      // Refresh search views if returning to them
+      document.getElementById('searchResults').innerHTML = '';
+      document.getElementById('manualResults').innerHTML = '';
+      document.getElementById('searchInput').value = '';
+      document.getElementById('manualInput').value = '';
+    }
+
+    // ---------- SEARCH (view only) ----------
+    let searchDebounce;
+    function doSearch() {
+      clearTimeout(searchDebounce);
+      const q = document.getElementById('searchInput').value;
+      if (q.length < 2) { document.getElementById('searchResults').innerHTML = ''; return; }
+      searchDebounce = setTimeout(async () => {
+        const res = await api('searchGuest', { query: q });
+        renderSearchResults(res.success ? res.data : []);
+      }, 300);
+    }
+
+    function renderSearchResults(results) {
+      const container = document.getElementById('searchResults');
+      if (!results.length) { container.innerHTML = '<p style="color:#888">No matches.</p>'; return; }
+      container.innerHTML = results.map(g => `
+        <div class="result-card">
+          <div class="name">${g['Ticket ID']}</div>
+          <span class="status ${g.Status === 'Used' ? 'used' : 'unused'}">${g.Status}</span>
+        </div>
+      `).join('');
+    }
+
+    // ---------- MANUAL CHECK-IN ----------
+    let manualDebounce;
+    function doManualSearch() {
+      clearTimeout(manualDebounce);
+      const q = document.getElementById('manualInput').value;
+      if (q.length < 2) { document.getElementById('manualResults').innerHTML = ''; return; }
+      manualDebounce = setTimeout(async () => {
+        const res = await api('searchGuest', { query: q });
+        renderManualResults(res.success ? res.data : []);
+      }, 300);
+    }
+
+    function renderManualResults(results) {
+      const container = document.getElementById('manualResults');
+      if (!results.length) { container.innerHTML = '<p style="color:#888">No matches.</p>'; return; }
+      container.innerHTML = results.map(g => `
+        <div class="result-card">
+          <div class="name">${g['Ticket ID']}</div>
+          <span class="status ${g.Status === 'Used' ? 'used' : 'unused'}">${g.Status}</span>
+          ${g.Status !== 'Used' ? `<button class="checkin-btn" onclick="manualCheckInGuest('${g['Ticket ID']}')">CHECK IN</button>` : ''}
+        </div>
+      `).join('');
+    }
+
+    async function manualCheckInGuest(ticketId) {
+      const res = await api('manualCheckIn', { ticketId, staffName });
+      showResult(res);
+    }
+  </script>
+</body>
+</html>
