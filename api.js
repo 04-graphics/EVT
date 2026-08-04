@@ -8,7 +8,7 @@
 //    You can override it per-link with a "?api=..." query param (used
 //    e.g. when opening scanner.html from staff.html) — the override is
 //    remembered in localStorage so you don't have to pass it on every page.
-const DEFAULT_API_URL = 'PASTE_YOUR_APPS_SCRIPT_WEB_APP_URL_HERE';
+const DEFAULT_API_URL = 'https://script.google.com/macros/s/AKfycbzAnoslatPJvcAo4ooKYI5MlCMwnYjru3ZpnE3PZ3Es7VlJeugFhccFhlEMImD4n3wH/exec';
 
 (function () {
   const qs = new URLSearchParams(location.search);
