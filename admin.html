@@ -136,11 +136,7 @@
 
     #csvFileInput { padding: 10px; border: 1.5px dashed #ccc; border-radius: 8px; background: #fafafa; }
 
-    #printArea {
-  display: none;
-}
-
-@media print {
+    @media print {
   body * {
     visibility: hidden;
   }
@@ -151,14 +147,15 @@
   }
 
   #printArea {
-    display: block;
+    display: block !important;
     position: absolute;
     top: 0;
     left: 0;
     width: 100%;
   }
 }
-  </style>
+
+    </style>
 </head>
 <body>
 
@@ -347,7 +344,7 @@
   </div>
 
   <!-- Hidden print area -->
-  <div id="printArea" style="display:none;"></div>
+  <div id="printArea"></div>
 
   <script src="js/api.js"></script>
   <script>
