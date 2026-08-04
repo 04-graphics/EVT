@@ -265,14 +265,14 @@
       setTimeout(() => { scanLock = false; }, 2000);
     }
 
-    function jsonp(url, timeoutMs) {
+    function jsonp(url) {
       return new Promise((resolve, reject) => {
         const cb = 'cb_' + Math.random().toString(36).slice(2);
         const script = document.createElement('script');
         const timeout = setTimeout(() => {
           cleanup();
           reject(new Error('Request timed out'));
-        }, timeoutMs || 25000);
+        }, 15000);
 
         function cleanup() {
           clearTimeout(timeout);
@@ -293,23 +293,6 @@
         script.src = url + (url.includes('?') ? '&' : '?') + 'callback=' + encodeURIComponent(cb);
         document.body.appendChild(script);
       });
-    }
-
-    // Retries once after a short pause. Safe to retry here specifically because
-    // checkInTicket() on the backend is idempotent for a given ticket: if the
-    // first attempt actually succeeded but the response got lost in transit
-    // (cold start / flaky mobile network), the retry just comes back
-    // ALREADY_USED instead of VALID — it can never double-check someone in.
-    async function jsonpWithRetry(url, timeoutMs, retries) {
-      retries = retries == null ? 1 : retries;
-      try {
-        return await jsonp(url, timeoutMs);
-      } catch (err) {
-        if (retries <= 0) throw err;
-        setStatus('<span class="spinner"></span> <strong>Slow connection, retrying…</strong>');
-        await new Promise(r => setTimeout(r, 1200));
-        return jsonpWithRetry(url, timeoutMs, retries - 1);
-      }
     }
 
     async function checkInTicket(ticketId) {
@@ -335,7 +318,7 @@
       '&staffName=' + encodeURIComponent(STAFF_NAME) +
       '&gateLabel=' + encodeURIComponent(GATE_LABEL);
 
-    const res = await jsonpWithRetry(url, 25000, 1);
+    const res = await jsonp(url);
 
     console.log("Scanner response:", res);
 
@@ -394,8 +377,8 @@
     openPopup(
       'invalid',
       'Connection Error',
-      'Could not reach the backend after retrying.',
-      'Check your connection and scan again — it\u2019s safe to retry, it will just say "already used" if it went through.',
+      'Could not reach the Apps Script backend.',
+      '',
       '',
       '❌'
     );
